@@ -429,8 +429,19 @@ func (c *Client) addItem(ctx context.Context, inv *Inventory, id string, filesSe
 					return errors.New("episode season mismatch")
 				}
 				for _, f := range ep.Files {
-					if old, ok := membership[f.FileID]; ok && (old.Season != ep.Season || old.Episode != ep.Number) {
-						return errors.New("ambiguous episode file membership")
+					if old, ok := membership[f.FileID]; ok {
+						// A multi-episode file (S01E01-E03) is listed under each of its
+						// episodes. Within one season its destination is the same, so the
+						// lowest episode stands for it. Taking the lowest rather than the
+						// first listed keeps the destination fingerprint and the episode
+						// folder check independent of Silo's row order. Only a file
+						// claimed by two seasons is ambiguous.
+						if old.Season != ep.Season {
+							return errors.New("ambiguous episode file membership")
+						}
+						if ep.Number >= old.Episode {
+							continue
+						}
 					}
 					membership[f.FileID] = Membership{ItemID: item.ID, Kind: item.Type, Season: ep.Season, Episode: ep.Number, SeasonID: s.ID}
 				}
